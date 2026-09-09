@@ -520,6 +520,11 @@ body.mobile-preview-child #mobilePreviewOverlay,body.mobile-preview-child .mobil
     left:0!important;
   }
 }
+
+<style id="v19-invoice-premium">
+.invoice-shell{background:linear-gradient(180deg,#fffdf8,#f7f1e7);border:1px solid #ded4c4;border-radius:18px;overflow:hidden;box-shadow:0 12px 34px rgba(54,48,39,.10)}
+.invoice-head{padding:18px 18px 14px;background:linear-gradient(135deg,#4f554d,#343733);color:#fff}.invoice-brand{font-size:20px;font-weight:900;letter-spacing:.2px}.invoice-title{font-size:13px;font-weight:800;opacity:.9;margin-top:3px;letter-spacing:.8px}.invoice-meta{display:grid;grid-template-columns:1fr 1fr;gap:7px 16px;padding:13px 18px;border-bottom:1px dashed #d7cdbd;font-size:13px}.invoice-meta span{color:#777268}.invoice-meta b{color:#3f433e}.invoice-items{padding:4px 18px}.invoice-item{display:grid;grid-template-columns:1fr auto;gap:8px;padding:11px 0;border-bottom:1px solid #eee8de}.invoice-item:last-child{border-bottom:0}.invoice-item-name{font-weight:800;color:#3e423d}.invoice-item-sub{font-size:12px;color:#858077;margin-top:3px}.invoice-item-total{font-weight:800;color:#4c5049;white-space:nowrap}.invoice-summary{padding:12px 18px;border-top:1px dashed #d7cdbd;background:#fbf7ef}.invoice-summary-row{display:flex;justify-content:space-between;gap:12px;padding:4px 0;color:#656158;font-size:13px}.invoice-grand{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0 3px;margin-top:5px;border-top:1px solid #ddd4c6;font-size:17px;color:#352f27}.invoice-grand strong:last-child{font-size:19px}.invoice-footer{text-align:center;padding:14px 18px 17px;color:#746e64;font-size:12px}.invoice-footer b{display:block;color:#4b5048;font-size:14px;margin-bottom:4px}.invoice-call-note{padding:9px 18px;background:#f0ece4;color:#70695f;font-size:12px;border-top:1px solid #e2dacd;border-bottom:1px solid #e2dacd}.invoice-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.invoice-actions .btn{flex:1;min-width:120px}@media(max-width:700px){.invoice-meta{grid-template-columns:1fr}.invoice-items,.invoice-summary,.invoice-head,.invoice-meta,.invoice-footer,.invoice-call-note{padding-left:14px;padding-right:14px}}
+</style>
 </style>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#2f7d32">
@@ -1233,14 +1238,22 @@ window.openTable=id=>{
    const grandQty=allItems.reduce((s,i)=>s+Number(i.qty||0),0);
    const firstTime=new Date(os[0].createdAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
    const lastTime=new Date(os[os.length-1].createdAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
-   body.innerHTML=`<div class="card table-order-card" style="margin:8px 0">
-     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-       <b>HÓA ĐƠN TỔNG HỢP · ${firstTime}${os.length>1?' → '+lastTime:''}</b>
-       <span class="status-pill">${grandQty} món</span>
+   body.innerHTML=`<div class="invoice-shell">
+     <div class="invoice-head"><div class="invoice-brand">${escHTML(db.settings?.shopName||'KU SỬU POS')}</div><div class="invoice-title">HÓA ĐƠN BÁN HÀNG · HÓA ĐƠN TỔNG HỢP</div></div>
+     <div class="invoice-meta">
+       <div><span>Số hóa đơn</span><br><b>KS-${escHTML(String(os[0].paymentGroupId||os[0].id||'').replace(/[^a-zA-Z0-9]/g,'').slice(-8).toUpperCase())}</b></div>
+       <div><span>Thời gian</span><br><b>${firstTime}${os.length>1?' → '+lastTime:''}</b></div>
+       <div><span>Bàn</span><br><b>${escHTML(t.name)}</b></div>
+       <div><span>Trạng thái</span><br><b>ĐANG MỞ · ${grandQty} món</b></div>
      </div>
-     <div class="mini" style="margin:7px 0 4px">${os.length} lượt gọi · đã gộp toàn bộ món của ${t.name}</div>
-     <ul>${allItems.map(i=>`<li>${escHTML(i.name)} × ${i.qty} = ${VND(i.total)}</li>`).join('')}</ul>
-     <div class="table-order-total"><b>Tổng thanh toán: ${VND(grandTotal)}</b></div>
+     <div class="invoice-call-note">${os.length} lượt gọi món đã được gộp thành <b>một hóa đơn duy nhất</b>.</div>
+     <div class="invoice-items">${allItems.map(i=>`<div class="invoice-item"><div><div class="invoice-item-name">${escHTML(i.name)}</div><div class="invoice-item-sub">${i.qty} × ${VND(i.price)}</div></div><div class="invoice-item-total">${VND(i.total)}</div></div>`).join('')}</div>
+     <div class="invoice-summary">
+       <div class="invoice-summary-row"><span>Tạm tính</span><b>${VND(grandTotal)}</b></div>
+       <div class="invoice-summary-row"><span>Giảm giá</span><b>0 đ</b></div>
+       <div class="invoice-grand"><strong>TỔNG THANH TOÁN</strong><strong>${VND(grandTotal)}</strong></div>
+     </div>
+     <div class="invoice-footer"><b>Chưa thanh toán</b>Kiểm tra lại món trước khi thanh toán hoặc in hóa đơn.</div>
    </div>`;
  }
  document.getElementById('tableModal').classList.add('show');
