@@ -1,4 +1,4 @@
-name: Build Ku Suu POS V18 APK
+name: Build Ku Suu POS V19.7.2 APK
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build Android APK
+    name: Build Android APK V19.7.2
     runs-on: ubuntu-latest
 
     steps:
@@ -74,7 +74,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Ku-Suu-POS-V18-APK
+          name: Ku-Suu-POS-V19.7.2-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
