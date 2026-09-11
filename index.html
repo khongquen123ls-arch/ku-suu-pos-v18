@@ -1099,15 +1099,71 @@ function makeReceiptData(orders){
  const receipt={shopName:db.settings?.shopName||'Quán Ku Sửu',address:db.settings?.address||'190 Bà Triệu',phone:db.settings?.phone||'0825626399',invoiceNo:first.invoiceNo||getInvoiceNumber(orders),date,table:first.tableName||'Bàn',cashier:first.cashier||'Chưa xác định',items:items.map(i=>({name:i.name,qty:Number(i.qty||0),total:Math.round(i.total||0)})),total:Math.round(total),qrBankId:db.settings?.qrBankId||'',qrAccountNo:db.settings?.qrAccountNo||'',qrAccountName:db.settings?.qrAccountName||''};
  receipt.qrUrl=qrUrlForReceipt(receipt); return receipt;
 }
-function receiptRaster(orders){
- const W=576,pad=24,fs=25,small=20,lh=31; const receipt=makeReceiptData(orders); const items=receipt.items; const lines=[];
- const wrap=(text,max=38)=>{const out=[];let rest=String(text||'').trim();while(rest.length>max){let k=rest.lastIndexOf(' ',max);if(k<10)k=max;out.push(rest.slice(0,k).trim());rest=rest.slice(k).trim()}if(rest)out.push(rest);return out};
- lines.push({t:receipt.shopName,b:1,c:fs,a:'center'});lines.push({t:`${receipt.address}  |  ĐT: ${receipt.phone}`,c:small,a:'center'});lines.push({t:'HÓA ĐƠN BÁN HÀNG',b:1,c:fs,a:'center'});lines.push({t:`Số HĐ: ${receipt.invoiceNo}    Bàn: ${receipt.table}`,c:small,a:'left'});lines.push({t:`Ngày: ${receipt.date}    Thu ngân: ${receipt.cashier}`,c:small,a:'left'});lines.push({t:'-----------------------------------------------',c:small,a:'center'});lines.push({t:'MÓN                         SL       THÀNH TIỀN',b:1,c:small,a:'left'});
- items.forEach(i=>{const wrapped=wrap(i.name,28);wrapped.forEach((n,idx)=>lines.push({t:idx===0?`${n.padEnd(29,' ')}${String(i.qty).padStart(4,' ')}   ${new Intl.NumberFormat('vi-VN').format(i.total).padStart(11,' ')} đ`:n,c:small,a:'left'}));});
- lines.push({t:'-----------------------------------------------',c:small,a:'center'});lines.push({t:`TỔNG THANH TOÁN: ${new Intl.NumberFormat('vi-VN').format(receipt.total)} đ`,b:1,c:fs,a:'left'});lines.push({t:'',c:small});lines.push({t:'CẢM ƠN QUÝ KHÁCH!',b:1,c:small,a:'center'});lines.push({t:'HẸN GẶP LẠI',c:small,a:'center'});
- const H=pad*2+lines.length*lh+20,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#000';ctx.textBaseline='top';let y=pad;
- lines.forEach(l=>{ctx.font=`${l.b?'700 ':''}${l.c}px Arial, sans-serif`;const w=ctx.measureText(l.t).width;let x=l.a==='center'?(W-w)/2:l.a==='right'?W-pad-w:pad;ctx.fillText(l.t,x,y);y+=lh});
- const d=ctx.getImageData(0,0,W,H).data,bytes=new Uint8Array(Math.ceil(W/8)*H),wb=W/8;for(let yy=0;yy<H;yy++)for(let xx=0;xx<W;xx++){const id=(yy*W+xx)*4;if(d[id]<180)bytes[yy*wb+(xx>>3)]|=(0x80>>(xx&7));}return {base64:btoa(String.fromCharCode(...bytes)),widthBytes:wb};
+async function receiptRaster(orders){
+ const W=576,pad=28,fs=28,small=22,lh=34,receipt=makeReceiptData(orders),items=receipt.items;
+ const canvas=document.createElement('canvas');
+ const ctx=canvas.getContext('2d');
+ const font='Arial, "Noto Sans", sans-serif';
+ const money=v=>new Intl.NumberFormat('vi-VN').format(Math.round(v))+' đ';
+ const qty=v=>formatQtyDisplay(v);
+ const wrap=(text,maxWidth,fontSpec)=>{
+   const words=String(text||'').trim().split(/\s+/).filter(Boolean); if(!words.length)return [''];
+   ctx.font=fontSpec; const out=[]; let line=words[0];
+   for(let i=1;i<words.length;i++){
+     const test=line+' '+words[i];
+     if(ctx.measureText(test).width<=maxWidth) line=test; else {out.push(line);line=words[i];}
+   }
+   out.push(line); return out;
+ };
+ const rows=[];
+ const add=(text,opt={})=>rows.push({text:String(text??''),size:opt.size||small,bold:!!opt.bold,align:opt.align||'left',gapBefore:opt.gapBefore||0,gapAfter:opt.gapAfter||0});
+ add(receipt.shopName,{size:fs,bold:true,align:'center',gapAfter:4});
+ add(`${receipt.address}  |  ĐT: ${receipt.phone}`,{size:small,align:'center',gapAfter:12});
+ add('HÓA ĐƠN BÁN HÀNG',{size:fs,bold:true,align:'center',gapAfter:12});
+ rows.push({meta:true,left:`Số HĐ: ${receipt.invoiceNo}`,right:`Bàn: ${receipt.table}`});
+ rows.push({meta:true,left:`Ngày: ${receipt.date}`,right:`Thu ngân: ${receipt.cashier||'Chưa xác định'}`,gapAfter:12});
+ rows.push({rule:true});
+ rows.push({columnsHead:true});
+ rows.push({rule:true,light:true});
+ items.forEach(i=>{
+   const nameLines=wrap(i.name,300,` ${small}px ${font}`.trim());
+   nameLines.forEach((n,idx)=>rows.push({item:true,name:n,qty:idx===0?qty(i.qty):'',money:idx===0?money(i.total):''}));
+ });
+ rows.push({rule:true,light:true});
+ rows.push({total:true});
+ rows.push({rule:true});
+ add('CẢM ƠN QUÝ KHÁCH!',{size:small,bold:true,align:'center',gapBefore:14});
+ add('HẸN GẶP LẠI',{size:small,align:'center',gapAfter:4});
+ const lineCount=rows.reduce((n,r)=>n+(r.item?1:1),0);
+ canvas.width=W; canvas.height=Math.max(300,pad*2+lineCount*lh+80);
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,W,canvas.height);ctx.fillStyle='#000';ctx.textBaseline='middle';ctx.imageSmoothingEnabled=false;
+ let y=pad+lh/2;
+ const drawText=(text,size,bold,align,x1,x2)=>{
+   ctx.font=`${bold?'700':'400'} ${size}px ${font}`;
+   const w=ctx.measureText(text).width; let x=align==='center'?(x1+x2-w)/2:align==='right'?x2-w:x1;
+   ctx.fillText(text,x,y);
+ };
+ for(const r of rows){
+   if(r.rule){ctx.beginPath();ctx.lineWidth=r.light?1:2;ctx.moveTo(pad,y);ctx.lineTo(W-pad,y);ctx.stroke();y+=lh;continue;}
+   if(r.meta){
+     drawText(r.left,small,false,'left',pad,300); drawText(r.right,small,false,'right',300,W-pad); y+=lh+(r.gapAfter||0); continue;
+   }
+   if(r.columnsHead){
+     drawText('MÓN',small,true,'left',pad,335); drawText('SL',small,true,'center',350,420); drawText('THÀNH TIỀN',small,true,'right',425,W-pad); y+=lh; continue;
+   }
+   if(r.item){
+     drawText(r.name,small,false,'left',pad,335); drawText(r.qty,small,false,'center',350,420); drawText(r.money,small,false,'right',425,W-pad); y+=lh; continue;
+   }
+   if(r.total){
+     drawText('TỔNG THANH TOÁN',fs,true,'left',pad,350); drawText(money(receipt.total),fs,true,'right',350,W-pad); y+=lh+4; continue;
+   }
+   y+=r.gapBefore||0; drawText(r.text,r.size,r.bold,r.align,pad,W-pad); y+=lh+(r.gapAfter||0);
+ }
+ const data=ctx.getImageData(0,0,W,Math.ceil(y+pad)).data;
+ const H=Math.ceil(y+pad),wb=Math.ceil(W/8),bytes=new Uint8Array(wb*H);
+ for(let yy=0;yy<H;yy++)for(let xx=0;xx<W;xx++){const id=(yy*W+xx)*4;if(data[id]<180)bytes[yy*wb+(xx>>3)]|=(0x80>>(xx&7));}
+ let binary='';const CHUNK=0x8000;for(let i=0;i<bytes.length;i+=CHUNK)binary+=String.fromCharCode(...bytes.subarray(i,i+CHUNK));
+ return {base64:btoa(binary),widthBytes:wb};
 }
 function renderProfessionalInvoice(orders){
  const receipt=makeReceiptData(orders); const esc=escHTML; const rows=receipt.items.map(i=>`<div class="invoice-item"><div class="name">${esc(i.name)}</div><div class="qty">${esc(formatQtyDisplay(i.qty))}</div><div class="money">${esc(VND(i.total))}</div></div>`).join('');
@@ -1119,12 +1175,11 @@ async function sendThermalPrint(orders,silent=false){
  const st=getPrinterSettings();if(!st.ip)return {ok:false,error:'Chưa nhập IP máy in.'};
  try{
    const receipt=makeReceiptData(orders); let x;
-   if(window.KuSuuPrinter&&typeof window.KuSuuPrinter.printReceipt==='function'){
-     x=JSON.parse(window.KuSuuPrinter.printReceipt(st.ip,st.port,JSON.stringify(receipt)));
-   }else if(window.KuSuuPrinter&&typeof window.KuSuuPrinter.printRaster==='function'){
-     const raster=receiptRaster(orders);x=JSON.parse(window.KuSuuPrinter.printRaster(st.ip,st.port,raster.widthBytes,raster.base64));
+   const raster=await receiptRaster(orders);
+   if(window.KuSuuPrinter&&typeof window.KuSuuPrinter.printRaster==='function'){
+     x=JSON.parse(window.KuSuuPrinter.printRaster(st.ip,st.port,raster.widthBytes,raster.base64));
    }else{
-     const raster=receiptRaster(orders);const r=await fetch(st.bridge+'/print',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({printerIp:st.ip,port:st.port,widthBytes:raster.widthBytes,rasterBase64:raster.base64})});x=await r.json();
+     const r=await fetch(st.bridge+'/print',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({printerIp:st.ip,port:st.port,widthBytes:raster.widthBytes,rasterBase64:raster.base64})});x=await r.json();
    }
    if(!x.ok)throw new Error(x.error||'Không gửi được lệnh in');
    if(!silent)alert('Đã gửi hóa đơn tới máy in.'); return x;
