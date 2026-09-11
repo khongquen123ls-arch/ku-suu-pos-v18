@@ -13,6 +13,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.ByteArrayInputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.charset.Charset
@@ -91,6 +94,28 @@ class MainActivity : android.app.Activity() {
         }
 
         /** V19.7.1 compatibility / fallback for printers that need raster output. */
+        @JavascriptInterface
+        fun fetchImageBase64(url: String): String {
+            return try {
+                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 6000
+                    readTimeout = 10000
+                    requestMethod = "GET"
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "KuSuuPOS/19.7.3")
+                }
+                try {
+                    if (conn.responseCode !in 200..299) throw Exception("HTTP ${conn.responseCode}")
+                    val data = conn.inputStream.use { it.readBytes() }
+                    android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP)
+                } finally {
+                    conn.disconnect()
+                }
+            } catch (e: Exception) {
+                ""
+            }
+        }
+
         @JavascriptInterface
         fun printRaster(ip: String, port: Int, widthBytes: Int, base64: String): String {
             return try {

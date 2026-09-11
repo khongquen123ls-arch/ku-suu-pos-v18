@@ -1101,6 +1101,23 @@ function makeReceiptData(orders){
 }
 async function receiptRaster(orders){
  const W=576,pad=28,fs=28,small=22,lh=34,receipt=makeReceiptData(orders),items=receipt.items;
+ let qrDataUrl='';
+ if(receipt.qrUrl){
+   try{
+     let b64='';
+     if(window.KuSuuPrinter&&typeof window.KuSuuPrinter.fetchImageBase64==='function') b64=window.KuSuuPrinter.fetchImageBase64(receipt.qrUrl);
+     if(b64) qrDataUrl='data:image/png;base64,'+b64;
+     else{
+       const img=await new Promise((resolve,reject)=>{const el=new Image();el.crossOrigin='anonymous';el.onload=()=>resolve(el);el.onerror=reject;el.src=receipt.qrUrl;});
+       const c=document.createElement('canvas');c.width=480;c.height=480;c.getContext('2d').drawImage(img,0,0,480,480);
+       qrDataUrl=c.toDataURL('image/png');
+     }
+   }catch(e){ qrDataUrl=''; }
+ }
+ let qrImg=null;
+ if(qrDataUrl){
+   try{qrImg=await new Promise((resolve,reject)=>{const el=new Image();el.onload=()=>resolve(el);el.onerror=reject;el.src=qrDataUrl;});}catch(e){qrImg=null;}
+ }
  const canvas=document.createElement('canvas');
  const ctx=canvas.getContext('2d');
  const font='Arial, "Noto Sans", sans-serif';
@@ -1134,8 +1151,9 @@ async function receiptRaster(orders){
  rows.push({rule:true});
  add('CẢM ƠN QUÝ KHÁCH!',{size:small,bold:true,align:'center',gapBefore:14});
  add('HẸN GẶP LẠI',{size:small,align:'center',gapAfter:4});
- const lineCount=rows.reduce((n,r)=>n+(r.item?1:1),0);
- canvas.width=W; canvas.height=Math.max(300,pad*2+lineCount*lh+80);
+ const lineCount=rows.reduce((n,r)=>n+1,0);
+ const qrExtra=qrImg?210:0;
+ canvas.width=W; canvas.height=Math.max(300,pad*2+lineCount*lh+80+qrExtra);
  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,canvas.height);ctx.fillStyle='#000';ctx.textBaseline='middle';ctx.imageSmoothingEnabled=false;
  let y=pad+lh/2;
  const drawText=(text,size,bold,align,x1,x2)=>{
@@ -1155,7 +1173,19 @@ async function receiptRaster(orders){
      drawText(r.name,small,false,'left',pad,335); drawText(r.qty,small,false,'center',350,420); drawText(r.money,small,false,'right',425,W-pad); y+=lh; continue;
    }
    if(r.total){
-     drawText('TỔNG THANH TOÁN',fs,true,'left',pad,350); drawText(money(receipt.total),fs,true,'right',350,W-pad); y+=lh+4; continue;
+     drawText('TỔNG THANH TOÁN',fs,true,'left',pad,350); drawText(money(receipt.total),fs,true,'right',350,W-pad); y+=lh+4;
+     if(qrImg){
+       const q=170, qx=(W-q)/2;
+       ctx.imageSmoothingEnabled=true;
+       ctx.drawImage(qrImg,qx,y,q,q);
+       y+=q+8;
+       drawText('QUÉT QR ĐỂ CHUYỂN KHOẢN',18,true,'center',pad,W-pad);
+       y+=26;
+       drawText('Nội dung: '+receipt.invoiceNo,18,false,'center',pad,W-pad);
+       y+=lh;
+       ctx.imageSmoothingEnabled=false;
+     }
+     continue;
    }
    y+=r.gapBefore||0; drawText(r.text,r.size,r.bold,r.align,pad,W-pad); y+=lh+(r.gapAfter||0);
  }
