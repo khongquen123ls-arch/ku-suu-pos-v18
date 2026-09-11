@@ -11,8 +11,8 @@ android {
         applicationId = "com.kusuu.pos"
         minSdk = 23
         targetSdk = 35
-        versionCode = 2073
-        versionName = "19.7.3"
+        versionCode = 2074
+        versionName = "19.7.4"
     }
 
     compileOptions {

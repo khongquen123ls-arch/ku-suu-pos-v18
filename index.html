@@ -1088,7 +1088,7 @@ function qrUrlForReceipt(receipt){
  const bank=encodeURIComponent(String(s.qrBankId).trim()),acct=encodeURIComponent(String(s.qrAccountNo).trim());
  const info=encodeURIComponent(('HD '+receipt.invoiceNo).slice(0,50));
  const name=encodeURIComponent(String(s.qrAccountName).trim());
- return `https://img.vietqr.io/image/${bank}-${acct}-compact2.png?amount=${Math.round(receipt.total||0)}&addInfo=${info}&accountName=${name}`;
+ return `https://img.vietqr.io/image/${bank}-${acct}-qr_only.png?amount=${Math.round(receipt.total||0)}&addInfo=${info}&accountName=${name}`;
 }
 function makeReceiptData(orders){
  const items=mergedBillItems(orders), total=orders.reduce((s,o)=>s+Number(o.total||0),0);
@@ -1152,7 +1152,7 @@ async function receiptRaster(orders){
  add('CẢM ƠN QUÝ KHÁCH!',{size:small,bold:true,align:'center',gapBefore:14});
  add('HẸN GẶP LẠI',{size:small,align:'center',gapAfter:4});
  const lineCount=rows.reduce((n,r)=>n+1,0);
- const qrExtra=qrImg?210:0;
+ const qrExtra=qrImg?270:0;
  canvas.width=W; canvas.height=Math.max(300,pad*2+lineCount*lh+80+qrExtra);
  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,canvas.height);ctx.fillStyle='#000';ctx.textBaseline='middle';ctx.imageSmoothingEnabled=false;
  let y=pad+lh/2;
@@ -1175,8 +1175,8 @@ async function receiptRaster(orders){
    if(r.total){
      drawText('TỔNG THANH TOÁN',fs,true,'left',pad,350); drawText(money(receipt.total),fs,true,'right',350,W-pad); y+=lh+4;
      if(qrImg){
-       const q=170, qx=(W-q)/2;
-       ctx.imageSmoothingEnabled=true;
+       const q=220, qx=(W-q)/2;
+       ctx.imageSmoothingEnabled=false;
        ctx.drawImage(qrImg,qx,y,q,q);
        y+=q+8;
        drawText('QUÉT QR ĐỂ CHUYỂN KHOẢN',18,true,'center',pad,W-pad);
